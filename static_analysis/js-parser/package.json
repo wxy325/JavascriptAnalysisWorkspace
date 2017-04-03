@@ -1,0 +1,7 @@
+{
+  "name": "js-parser",
+  "version": "0.0.1",
+  "dependencies": {
+    "esprima": "^3.1.3"
+  }
+}
