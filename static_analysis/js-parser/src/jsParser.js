@@ -13,10 +13,12 @@ function forTest(a) {\
 }\
 ";
 
-
+// Will ignore comment
 var tokenizeResult = esprima.tokenize(sampleCode);
 var parserResult = esprima.parse(sampleCode);
 
 console.log(tokenizeResult);
 console.log('-------');
 console.log(parserResult);
+console.log('--------');
+console.log(JSON.stringify(parserResult));
