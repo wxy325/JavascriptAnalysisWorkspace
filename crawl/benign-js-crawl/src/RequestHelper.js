@@ -26,8 +26,8 @@ RequestHelper.request = function (options, callback) {
     var params = options.params || {};
 
     var requestOption = {
-        'url' : url,
-        'encoding' : 'binary'
+        'url' : url
+        // 'encoding' : 'binary'
     };
     if (needProxy) {
         requestOption.proxy = 'http://proxy.wdf.sap.corp:8080';
@@ -51,8 +51,10 @@ RequestHelper.request = function (options, callback) {
             }
 
         }, function (response, body, callback) {
-            var b = Iconv.decode(new Buffer(body, 'binary'), decode);
-            callback(null, b);
+            // var encoding = response.headers['transfer-encoding'];
+          //  JSON.stringify(response);
+          //   var b = Iconv.decode(new Buffer(body, encoding || 'binary'), decode);
+            callback(null, body);
         }
     ], callback);
 };

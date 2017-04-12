@@ -16,22 +16,47 @@ var i = 2;
 var RequestHelper = require('./RequestHelper');
 var URL = require('url'), urlJoin = require('url-join');
 
-var MAX_SITES_NUMBER = 2000;
+var MAX_SITES_NUMBER = 4000;
 var outputPathBase = '/Users/wxy325/Desktop/scraw-output/';
 
 var siteIndex = 0;
 var crawledSiteList = [];
 
-function crawlUrl(url, callback) {
+function buildFullUrl(baseUrl, srcAddress) {
+    var urlObj = URL.parse(baseUrl);
+    if (!srcAddress.startsWith('http') && !srcAddress.startsWith('//')) {
+        if (srcAddress.startsWith('/')) {
+            var newAddr = urlJoin(urlObj.protocol + '//' + urlObj.hostname, srcAddress);
+            return newAddr;
+        } else {
+            return srcAddress;
+        }
+    } else {
+        return srcAddress;
+    }
+}
 
+function crawlUrl(url, subpageDeep, outterCallback) {
+    if (crawledSiteList.indexOf(url) !== -1 || url.startsWith('#') || url.startsWith('javascript')) {
+        outterCallback();
+        return;
+    }
+    var urlObj = new URL.parse(url);
+    if (!urlObj) {
+        outterCallback();
+        return;
+    }
+    console.log(siteIndex + ':' + url);
+    var currentUrlIndex = siteIndex;
+    crawledSiteList[siteIndex] = url;
+    siteIndex++;
     // var url = 'https://en.wikipedia.org/wiki/The_Heart_of_a_Woman';
-    var urlObj = URL.parse(url);
 
     async.waterfall([
         function (callback) {
 
             if (crawledSiteList.length > MAX_SITES_NUMBER) {
-                callback();
+                callback('finish');
                 return;
             }
             RequestHelper.request({
@@ -40,30 +65,26 @@ function crawlUrl(url, callback) {
             }, callback);
         }, function (body, callback) {
 
-
             if (crawledSiteList.length > MAX_SITES_NUMBER) {
                 callback();
                 return;
             }
 
+            var dom$ = null;
+            try{
+                dom$ = cheerio.load(body);
+            } catch (e) {
+                callback('error');
+                return;
+            }
 
-            // console.log(body);
-            var dom$ = cheerio.load(body);
             var scriptsTags = dom$('script');
-            // var srcReplaces = [];
 
             scriptsTags.each(function () {
                 var t = cheerio(this);
                 if (t.attr('src')) {
                     var srcAddress = t.attr('src');
-                    if (!srcAddress.startsWith('http') && !srcAddress.startsWith('//')) {
-                        if (srcAddress.startsWith('/')) {
-                            var newAddr = urlJoin(urlObj.protocol + '//' + urlObj.hostname, srcAddress);
-                            t.attr('src', newAddr);
-                        } else {
-                            t.attr('src', urlJoin(url, srcAddress));
-                        }
-                    }
+                    t.attr('src', buildFullUrl(url, srcAddress));
                 }
             });
             var linkTags = dom$('link');
@@ -71,23 +92,44 @@ function crawlUrl(url, callback) {
                 var t = cheerio(this);
                 if (t.attr('href')) {
                     var srcAddress = t.attr('href');
-                    if (!srcAddress.startsWith('http') && !srcAddress.startsWith('//')) {
-                        if (srcAddress.startsWith('/')) {
-                            var newAddr = urlJoin(urlObj.protocol + '//' + urlObj.hostname, srcAddress);
-                            t.attr('href', newAddr);
-                        } else {
-                            t.attr('href', urlJoin(url, srcAddress));
-                        }
-                    }
+                    t.attr('href', buildFullUrl(url, srcAddress));
                 }
             });
 
-            var e = dom$.html();
+            var e = null;
+            try {
+                e = dom$.html();
+            } catch (ee) {
+                callback('error');
+                return;
+            }
 
-            var outputFileName = String('0000' + siteIndex).slice(-4) + '.html';
+            var outputFileName = String('0000' + currentUrlIndex).slice(-4) + '.html';
             var outputFileFullPath = path.join(outputPathBase, outputFileName);
-            fs.writeFile(outputFileFullPath, e, callback);
+            fs.writeFileSync(outputFileFullPath, e);
             // can be modified
+
+            if (subpageDeep > 0) {
+                var aTags = dom$('a');
+                var crawSubPageTasks = [];
+                aTags.each(function () {
+                    var t = cheerio(this);
+                    if (t.attr('href')) {
+                        var srcAddress = t.attr('href');
+                        var newAddress = buildFullUrl(url, srcAddress);
+                        var createSubTask = function (u) {
+                            return function (innerCallback) {
+                                crawlUrl(u, subpageDeep - 1, innerCallback);
+                            }
+                        };
+                        crawSubPageTasks.push(createSubTask(newAddress));
+                    }
+                });
+
+                async.waterfall(crawSubPageTasks, callback);
+            } else {
+                callback();
+            }
         }, function (callback) {
 
             if (crawledSiteList.length > MAX_SITES_NUMBER) {
@@ -95,12 +137,9 @@ function crawlUrl(url, callback) {
                 return;
             }
 
-            console.log(siteIndex + ':' + url);
-            crawledSiteList[siteIndex] = url;
-            siteIndex++;
             callback();
         }
-    ], callback);
+    ], outterCallback);
 };
 
 
@@ -184,16 +223,16 @@ function startScrawl(callback) {
                                         return;
                                     }
 
-                                    crawlUrl(url, function (err) {
+                                    crawlUrl(url, 1, function (err) {
                                         callback();
                                     });
                                 };
                             });
-                            async.parallelLimit(fetchTasks, 5, callback);
+                            async.parallelLimit(fetchTasks, 10, callback);
                         }], innercallback);
                 };
             });
-            async.parallelLimit(tasks, 5, callback);
+            async.parallelLimit(tasks, 10, callback);
         }
     ], function (err) {
 
