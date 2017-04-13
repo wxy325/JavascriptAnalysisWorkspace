@@ -1,0 +1,1 @@
+$('#lmenu').toggle(50)

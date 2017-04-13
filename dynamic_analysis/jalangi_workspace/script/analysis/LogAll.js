@@ -26,6 +26,24 @@
  */
 
 (function (sandbox) {
+    ANALYSIS_PRE = "__ANALYSIS__:";
+    function analysisLog(content) {
+        console.log(ANALYSIS_PRE + content);
+    }
+
+    window.CollectGarbage = function () {
+        analysisLog('Call:IE_CollectionGarbage');
+    }
+    
+    function isNativeCode(f) {
+        if( /\{\s+\[native code\]/.test( Function.prototype.toString.call(f))) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+
     function MyAnalysis() {
 
         function getValue(v) {
@@ -40,8 +58,10 @@
 
 
         this.invokeFunPre = function (iid, f, base, args, isConstructor, isMethod, functionIid) {
-            console.log('invokeFunPre:' + f.name);
-            // console.log(f.name);
+            if (isNativeCode(f)) {
+                analysisLog('Call:' + base.constructor.name + '.' + f.name);
+            }
+            // analysisLog('ee:' + f);
             return {f: f, base: base, args: args, skip: false};
         };
 
@@ -50,6 +70,7 @@
         };
 
         this.literal = function (iid, val, hasGetterSetter) {
+            // console.log('literal' + val);
             return {result: val};
         };
 
@@ -58,6 +79,7 @@
         };
 
         this.declare = function (iid, name, val, isArgument, argumentIndex, isCatchParam) {
+            // console.log('declare' + val);
             return {result: val};
         };
 
@@ -66,20 +88,67 @@
         };
 
         this.getField = function (iid, base, offset, val, isComputed, isOpAssign, isMethodCall) {
+            if (base && base.constructor && isNativeCode(base.constructor)) {
+                if (base === window) {
+                    analysisLog("Get:Window.attribute" );
+                } else {
+                    var offsetDesc = offset;
+                    if (typeof(offsetDesc) !== 'number') {
+                        analysisLog("Get:" + base.constructor.name + '.' + offsetDesc);
+                    }
+                }
+            }
+
+
             var shadowObj = sandbox.smemory.getShadowObject(base, offset, true);
             var args = {base: sandbox.smemory.getIDFromShadowObjectOrFrame(shadowObj.owner), offset: offset, val: getValue(val), isComputed: isComputed, isOpAssign: isOpAssign, isMethodCall: isMethodCall};
             // console.log("getField("+JSON.stringify(args)+") at " + J$.iidToLocation(J$.sid, iid));
             return {result: val};
         };
 
+        var logCreateInnerHtml = function(text) {
+            // return;
+            var fakeTag = document.createElement('div');
+            fakeTag.innerHTML = text;
+            var array = [];
+            array.push(fakeTag);
+            while (array.length) {
+                var e = array[0];
+                array.splice(0, 1);
+                for (var i = 0; i < e.children.length; i++) {
+                    var c = e.children[i];
+                    analysisLog('CREATE_DOM:' + c.tagName);
+                    array.push(c);
+                }
+            }
+        };
+
+
         this.putFieldPre = function (iid, base, offset, val, isComputed, isOpAssign) {
+            if (base && base.constructor && isNativeCode(base.constructor)) {
+                if (base === window) {
+                    analysisLog("Set:Window.attribute" );
+                } else {
+                    var offsetDesc = offset;
+                    if (typeof(offsetDesc) === 'number') {
+                        offsetDesc = '[index]';
+                    }
+                    analysisLog("Set:" + base.constructor.name + '.' + offsetDesc);
+
+                    if (offset == 'innerHTML') {
+                        logCreateInnerHtml(val);
+                    }
+                }
+            }
+
             return {base: base, offset: offset, val: val, skip: false};
         };
 
         this.putField = function (iid, base, offset, val, isComputed, isOpAssign) {
+            
+
             var shadowObj = sandbox.smemory.getShadowObject(base, offset, true);
             var args = {base: sandbox.smemory.getIDFromShadowObjectOrFrame(shadowObj.owner), offset: offset, val: getValue(val), isComputed: isComputed, isOpAssign: isOpAssign};
-            // console.log("putField("+JSON.stringify(args)+") at " + J$.iidToLocation(J$.sid, iid));
             return {result: val};
         };
 
@@ -171,6 +240,9 @@
     }
 
     sandbox.analysis = new MyAnalysis();
+    
+        
+    
 })(J$);
 
 
