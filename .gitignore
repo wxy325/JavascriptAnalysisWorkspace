@@ -1,0 +1,5 @@
+malware_workspace/data/benign_dataset
+malware_workspace/data/ligntweight-obfuscated-benign-output
+malware_workspace/data/obfuscated-benign-output
+malware_workspace/data/obfuscated-malicious-output
+crawl/benign-js-crawl/.idea
