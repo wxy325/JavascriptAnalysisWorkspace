@@ -6,3 +6,5 @@ crawl/benign-js-crawl/.idea
 malware_workspace/.idea
 static_analysis/js-parser/.idea
 config.py
+malware_workspace/data/benign_dataset_old
+malware_workspace/data/obfuscated-benign-output_old
