@@ -5,3 +5,4 @@ malware_workspace/data/obfuscated-malicious-output
 crawl/benign-js-crawl/.idea
 malware_workspace/.idea
 static_analysis/js-parser/.idea
+config.py
